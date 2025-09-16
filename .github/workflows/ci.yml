@@ -30,7 +30,9 @@ jobs:
 
       - name: Build
         run: |
-          npm ci && npm run build
+          npm ci
+          npm run build
+          # SPA fallback for GitHub Pages
           cp dist/index.html dist/404.html
 
       - name: Update pages artifact
