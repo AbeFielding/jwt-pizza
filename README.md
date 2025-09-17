@@ -1,3 +1,5 @@
+[![CI Pipeline](https://github.com/abefielding/jwt-pizza/actions/workflows/ci.yml/badge.svg)](https://github.com/abefielding/jwt-pizza/actions/workflows/ci.yml)
+
 # 🍕 JWT Pizza
 
 ![Coverage badge](https://pizza-factory.cs329.click/api/badge/accountId/jwtpizzacoverage?t=1)
@@ -150,4 +152,4 @@ export default function App() {
 
 [HeroIcons](https://heroicons.com/) - MIT license
 
-[![CI Pipeline](https://github.com/abefielding/jwt-pizza/actions/workflows/ci.yml/badge.svg)](https://github.com/abefielding/jwt-pizza/actions/workflows/ci.yml)
+
