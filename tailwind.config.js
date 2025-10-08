@@ -1,7 +1,12 @@
+/** @type {import('tailwindcss').Config} */
 const defaultTheme = require('tailwindcss/defaultTheme');
 
 module.exports = {
-  content: ['index.html', './src/**/*.{html,js,tsx}', './node_modules/preline/preline.js'],
+  content: [
+    './index.html',
+    './src/**/*.{html,js,ts,jsx,tsx}',
+    './node_modules/preline/preline.js'
+  ],
   theme: {
     extend: {
       animation: {
@@ -19,5 +24,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require('preline/plugin')],
+  plugins: [require('preline/plugin')], 
 };
