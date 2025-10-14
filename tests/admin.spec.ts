@@ -30,13 +30,11 @@ test('Create franchise screen has a submit control in form', async ({ page }) =>
   const form = page.locator('main form').first();
   await form.waitFor({ state: 'attached', timeout: 1500 });
 
-  // Scope to the form to avoid grabbing the hidden navbar button.
   const submit = form.locator('button[type="submit"], input[type="submit"], button:has-text("Create")').first();
-  // If the form uses a generic button, fallback to any visible button inside form.
   const finalSubmit = submit.or(form.locator('button, a[role="button"]').filter({ hasNot: page.locator('[data-hs-collapse]') }).first());
 
   await finalSubmit.waitFor({ state: 'visible', timeout: 1500 }).catch(() => {});
-  await finalSubmit.click().catch(() => {}); // our mock 200s everything
+  await finalSubmit.click().catch(() => {}); 
 });
 
 test('Create store screen has a submit control in form', async ({ page }) => {

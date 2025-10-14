@@ -1,4 +1,3 @@
-// tests/misc.spec.ts
 import { test, expect } from './fixtures/coverage';
 import { basicInit } from './utils/basicInit';
 

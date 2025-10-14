@@ -1,4 +1,3 @@
-// tests/utils/basicInit.ts
 import { expect } from '../fixtures/coverage';
 
 type RoleName = 'admin' | 'franchisee' | 'diner';
@@ -10,9 +9,9 @@ export type InitOpts = {
 };
 
 export async function basicInit(page: any, opts: InitOpts = {}) {
-  // Keep menu IDs as NUMBERS (your UI compares numerically)
+  // Default mock menu
   const menu = opts.menu ?? [
-    { id: 1, title: 'Veggie',    image: 'pizza1.png', price: 0.0038, description: 'A garden of delight' },
+    { id: 1, title: 'Veggie', image: 'pizza1.png', price: 0.0038, description: 'A garden of delight' },
     { id: 2, title: 'Pepperoni', image: 'pizza2.png', price: 0.0042, description: 'Spicy treat' },
   ];
 
@@ -21,10 +20,14 @@ export async function basicInit(page: any, opts: InitOpts = {}) {
   const validUsers: Record<string, any> = {
     'd@jwt.com':     { id: '3', name: 'Kai Chen',   email: 'd@jwt.com',     password: 'a',     roles: [{ role: 'diner' }] },
     'admin@jwt.com': { id: '1', name: 'Admin User', email: 'admin@jwt.com', password: 'admin', roles: rolesFromOpts },
-    'fran@jwt.com':  { id: '2', name: 'Fran User',  email: 'fran@jwt.com',  password: 'fran',  roles: [{ role: 'franchisee' }] },
+    'fran@jwt.com':  { id: '2', name: 'Fran User',  email: 'fran@jwt.com',  password: 'fran',  roles: [{ role: 'franchisee', objectId: '2' }] },
   };
 
   let loggedInUser = opts.loggedInEmail ? (validUsers[opts.loggedInEmail] ?? null) : null;
+
+if (loggedInUser) {
+  await page.addInitScript((t: string) => localStorage.setItem('token', t), 'abcdef');
+}
 
   // --- AUTH ---
   await page.route('*/**/api/auth', async (route: any) => {
@@ -55,7 +58,7 @@ export async function basicInit(page: any, opts: InitOpts = {}) {
     return route.fulfill({ json: loggedInUser ?? null });
   });
 
-  // --- MENU (specific endpoint; must NOT be shadowed) ---
+  // --- MENU ---
   await page.route('*/**/api/order/menu', async (route: any) => {
     expect(route.request().method()).toBe('GET');
     return route.fulfill({ json: menu });
@@ -98,10 +101,12 @@ export async function basicInit(page: any, opts: InitOpts = {}) {
     });
   });
 
-  // Optional: some apps fetch by id after "of-user"
-  await page.route(/\/api\/franchise\/2(\?.*)?$/, async (route: any) => {
-    return route.fulfill({
-      json: {
+  // --- FRANCHISE BY ID ---
+// Return an *array* to match what pizzaService.getFranchise(user) expects
+await page.route(/\/api\/franchise\/2(\?.*)?$/, async (route: any) => {
+  return route.fulfill({
+    json: [
+      {
         id: '2',
         name: 'LotaPizza',
         stores: [
@@ -109,15 +114,14 @@ export async function basicInit(page: any, opts: InitOpts = {}) {
           { id: '5', name: 'Springville' },
         ],
       },
-    });
+    ],
   });
+});
 
   // --- ORDER (consolidated) ---
-  // IMPORTANT: exclude '/api/order/menu' using negative lookahead so we don't break the Menu page
   await page.route(/\/api\/order(?!\/menu)(\/.*)?(\?.*)?$/, async (route: any) => {
     const method = route.request().method();
     if (method === 'GET') {
-      // History / list response (used by diner dashboards)
       return route.fulfill({
         json: {
           orders: [
@@ -138,11 +142,9 @@ export async function basicInit(page: any, opts: InitOpts = {}) {
       });
     }
     if (method === 'POST') {
-      // Create order response
       const orderReq = route.request().postDataJSON() || {};
       return route.fulfill({ json: { order: { ...orderReq, id: 23 }, jwt: 'eyJpYXQ' } });
     }
-    // Others
     return route.fulfill({ status: 200, json: {} });
   });
 

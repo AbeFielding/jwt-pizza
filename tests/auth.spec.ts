@@ -16,6 +16,5 @@ test('Login failure shows an error', async ({ page }) => {
   await page.getByLabel(/email address/i).fill('d@jwt.com');
   await page.getByLabel(/password/i).fill('wrong');
   await page.getByRole('button', { name: /login/i }).click();
-  // message area becomes non-empty
   await expect(page.locator('.h-4')).not.toHaveText('');
 });

@@ -8,8 +8,8 @@ test('Menu: checkout disabled until store + items, then enabled', async ({ page 
   const checkout = page.getByRole('button', { name: /checkout/i });
   await expect(checkout).toBeDisabled();
 
-  await page.getByRole('combobox').selectOption('4'); // choose store
-  await expect(checkout).toBeDisabled();              // still disabled until item selected
+  await page.getByRole('combobox').selectOption('4');
+  await expect(checkout).toBeDisabled();           
 
   await page.getByRole('link', { name: /veggie/i }).click();
   await expect(page.locator('form')).toContainText(/selected pizzas:\s*1/i);

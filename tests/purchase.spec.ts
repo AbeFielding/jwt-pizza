@@ -22,6 +22,6 @@ test('purchase flow with login and pay', async ({ page }) => {
   await expect(page.getByRole('main')).toContainText(/send me those 2 pizzas right now!/i);
   await expect(page.locator('tbody')).toContainText(/veggie/i);
   await expect(page.locator('tbody')).toContainText(/pepperoni/i);
-  await expect(page.locator('tfoot')).toContainText('₿'); // total in BTC shown
+  await expect(page.locator('tfoot')).toContainText('₿');
   await page.getByRole('button', { name: /pay now/i }).click();
 });
