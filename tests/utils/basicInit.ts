@@ -118,6 +118,34 @@ await page.route(/\/api\/franchise\/2(\?.*)?$/, async (route: any) => {
   });
 });
 
+// --- UPDATE USER ---
+await page.route(/\/api\/user\/\d+$/, async (route: any) => {
+  const method = route.request().method();
+  if (method !== 'PUT') {
+    return route.fulfill({ status: 405, json: { message: 'method not allowed' } });
+  }
+
+  const body = route.request().postDataJSON() || {};
+  // if not logged in, reject (optional)
+  if (!loggedInUser) {
+    return route.fulfill({ status: 401, json: { message: 'unauthorized' } });
+  }
+
+  // If email changes, move the user in the lookup map
+  if (body.email && body.email !== loggedInUser.email) {
+    delete validUsers[loggedInUser.email];
+  }
+
+  // Merge updates
+  loggedInUser = { ...loggedInUser, ...body };
+  validUsers[loggedInUser.email] = loggedInUser;
+
+  // Simulate service returning new token and user payload
+  return route.fulfill({ json: { user: loggedInUser, token: 'abcdef' } });
+});
+
+
+
   // --- ORDER (consolidated) ---
   await page.route(/\/api\/order(?!\/menu)(\/.*)?(\?.*)?$/, async (route: any) => {
     const method = route.request().method();
