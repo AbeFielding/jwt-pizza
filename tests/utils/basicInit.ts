@@ -15,19 +15,25 @@ export async function basicInit(page: any, opts: InitOpts = {}) {
     { id: 2, title: 'Pepperoni', image: 'pizza2.png', price: 0.0042, description: 'Spicy treat' },
   ];
 
-  const rolesFromOpts = (opts.roles ?? ['diner']).map(r => ({ role: r }));
+  const rolesFromOpts = (opts.roles ?? ['diner']).map((r) => ({ role: r }));
 
   const validUsers: Record<string, any> = {
-    'd@jwt.com':     { id: '3', name: 'Kai Chen',   email: 'd@jwt.com',     password: 'a',     roles: [{ role: 'diner' }] },
+    'd@jwt.com': { id: '3', name: 'Kai Chen', email: 'd@jwt.com', password: 'a', roles: [{ role: 'diner' }] },
     'admin@jwt.com': { id: '1', name: 'Admin User', email: 'admin@jwt.com', password: 'admin', roles: rolesFromOpts },
-    'fran@jwt.com':  { id: '2', name: 'Fran User',  email: 'fran@jwt.com',  password: 'fran',  roles: [{ role: 'franchisee', objectId: '2' }] },
+    'fran@jwt.com': { id: '2', name: 'Fran User', email: 'fran@jwt.com', password: 'fran', roles: [{ role: 'franchisee', objectId: '2' }] },
   };
 
-  let loggedInUser = opts.loggedInEmail ? (validUsers[opts.loggedInEmail] ?? null) : null;
+  // a working list for the Users table mock
+  let mockUsers: any[] = [
+    { id: 3, name: 'Kai Chen', email: 'd@jwt.com', roles: [{ role: 'diner' }] },
+    { id: 5, name: 'Buddy', email: 'b@jwt.com', roles: [{ role: 'admin' }] },
+  ];
 
-if (loggedInUser) {
-  await page.addInitScript((t: string) => localStorage.setItem('token', t), 'abcdef');
-}
+  let loggedInUser = opts.loggedInEmail ? validUsers[opts.loggedInEmail] ?? null : null;
+
+  if (loggedInUser) {
+    await page.addInitScript((t: string) => localStorage.setItem('token', t), 'abcdef');
+  }
 
   // --- AUTH ---
   await page.route('*/**/api/auth', async (route: any) => {
@@ -56,6 +62,67 @@ if (loggedInUser) {
   await page.route('*/**/api/user/me', async (route: any) => {
     expect(route.request().method()).toBe('GET');
     return route.fulfill({ json: loggedInUser ?? null });
+  });
+
+  // --- USER DELETE (DELETE /api/user/:id) ---
+  await page.route(/\/api\/user\/\d+$/, async (route: any) => {
+    if (route.request().method() !== 'DELETE') {
+      return route.fallback();
+    }
+    const pathname = new URL(route.request().url()).pathname;
+    const m = pathname.match(/\/api\/user\/(\d+)$/);
+    if (!m) {
+      return route.fulfill({ status: 400, body: JSON.stringify({ message: 'bad request' }) });
+    }
+    const id = Number(m[1]);
+    mockUsers = mockUsers.filter((u) => Number(u.id) !== id);
+    return route.fulfill({ status: 200, body: JSON.stringify({ message: 'user deleted' }) });
+  });
+
+  // --- UPDATE USER (PUT /api/user/:id) ---
+  await page.route(/\/api\/user\/\d+$/, async (route: any) => {
+    const method = route.request().method();
+    if (method !== 'PUT') {
+      // IMPORTANT: allow other handlers (like DELETE above) to catch it
+      return route.fallback();
+    }
+
+    const body = route.request().postDataJSON() || {};
+    if (!loggedInUser) {
+      return route.fulfill({ status: 401, json: { message: 'unauthorized' } });
+    }
+
+    if (body.email && body.email !== loggedInUser.email) {
+      delete validUsers[loggedInUser.email];
+    }
+
+    loggedInUser = { ...loggedInUser, ...body };
+    validUsers[loggedInUser.email] = loggedInUser;
+
+    return route.fulfill({ json: { user: loggedInUser, token: 'abcdef' } });
+  });
+
+  // --- USERS LIST (GET /api/user) ---
+  await page.route(/\/api\/user(\?.*)?$/, async (route: any) => {
+    if (route.request().method() !== 'GET') {
+      return route.fallback();
+    }
+    const url = new URL(route.request().url());
+    const pageParam = Number(url.searchParams.get('page') || '1');
+    const limitParam = Number(url.searchParams.get('limit') || '10');
+    const nameParam = (url.searchParams.get('name') || '*').trim();
+    const needle = nameParam === '*' || nameParam === '' ? null : nameParam.toLowerCase();
+
+    let filtered = mockUsers;
+    if (needle) {
+      filtered = mockUsers.filter((u) => (u.name || '').toLowerCase().includes(needle));
+    }
+
+    const start = Math.max(0, (pageParam - 1) * limitParam);
+    const slice = filtered.slice(start, start + limitParam);
+    const more = start + limitParam < filtered.length;
+
+    return route.fulfill({ status: 200, body: JSON.stringify({ users: slice, more }) });
   });
 
   // --- MENU ---
@@ -102,49 +169,20 @@ if (loggedInUser) {
   });
 
   // --- FRANCHISE BY ID ---
-// Return an *array* to match what pizzaService.getFranchise(user) expects
-await page.route(/\/api\/franchise\/2(\?.*)?$/, async (route: any) => {
-  return route.fulfill({
-    json: [
-      {
-        id: '2',
-        name: 'LotaPizza',
-        stores: [
-          { id: '4', name: 'Lehi' },
-          { id: '5', name: 'Springville' },
-        ],
-      },
-    ],
+  await page.route(/\/api\/franchise\/2(\?.*)?$/, async (route: any) => {
+    return route.fulfill({
+      json: [
+        {
+          id: '2',
+          name: 'LotaPizza',
+          stores: [
+            { id: '4', name: 'Lehi' },
+            { id: '5', name: 'Springville' },
+          ],
+        },
+      ],
+    });
   });
-});
-
-// --- UPDATE USER ---
-await page.route(/\/api\/user\/\d+$/, async (route: any) => {
-  const method = route.request().method();
-  if (method !== 'PUT') {
-    return route.fulfill({ status: 405, json: { message: 'method not allowed' } });
-  }
-
-  const body = route.request().postDataJSON() || {};
-  // if not logged in, reject (optional)
-  if (!loggedInUser) {
-    return route.fulfill({ status: 401, json: { message: 'unauthorized' } });
-  }
-
-  // If email changes, move the user in the lookup map
-  if (body.email && body.email !== loggedInUser.email) {
-    delete validUsers[loggedInUser.email];
-  }
-
-  // Merge updates
-  loggedInUser = { ...loggedInUser, ...body };
-  validUsers[loggedInUser.email] = loggedInUser;
-
-  // Simulate service returning new token and user payload
-  return route.fulfill({ json: { user: loggedInUser, token: 'abcdef' } });
-});
-
-
 
   // --- ORDER (consolidated) ---
   await page.route(/\/api\/order(?!\/menu)(\/.*)?(\?.*)?$/, async (route: any) => {

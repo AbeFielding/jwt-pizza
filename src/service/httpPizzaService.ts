@@ -116,6 +116,15 @@ class HttpPizzaService implements PizzaService {
     return Promise.resolve(user);
   }
 
+  async listUsers(page: number, limit: number, name: string) {
+  const resp = await this.callEndpoint(`/api/user?page=${page}&limit=${limit}&name=${encodeURIComponent(name)}`, 'GET');
+  return resp;
+}
+
+async deleteUser(userId: number) {
+  await this.callEndpoint(`/api/user/${userId}`, 'DELETE');
+}
+
   async docs(docType: string): Promise<Endpoints> {
     if (docType === 'factory') {
       return this.callEndpoint(pizzaFactoryUrl + `/api/docs`);

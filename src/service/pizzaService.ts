@@ -9,6 +9,11 @@ namespace Role {
     return user != null && Array.isArray(user.roles) && !!user.roles.find((r) => r.role === role);
   }
 }
+export interface UserListResponse {
+  users: User[];
+  more: boolean;
+}
+
 
 type Menu = Pizza[];
 
@@ -111,6 +116,8 @@ interface PizzaService {
   closeStore(franchise: Franchise, store: Store): Promise<null>;
   docs(docType: string): Promise<Endpoints>;
   updateUser(user: User): Promise<User>;
+  listUsers(page: number, limit: number, name: string): Promise<UserListResponse>;
+  deleteUser(userId: number): Promise<void>;
 }
 
 export { Role, PizzaService, User, Menu, Pizza, OrderHistory, Order, Franchise, FranchiseList, Store, OrderItem, Endpoint, Endpoints, OrderResponse, JWTPayload };
