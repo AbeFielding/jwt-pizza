@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   test:
+    name: Playwright + Coverage
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -34,6 +34,7 @@ jobs:
         env:
           CI: true
         run: npm run test:coverage
+
       - name: Upload Playwright HTML report
         if: always()
         uses: actions/upload-artifact@v4
@@ -60,7 +61,7 @@ jobs:
           path: coverage/
           if-no-files-found: ignore
           retention-days: 7
-      
+
       - name: Update coverage badge
         if: always()
         run: |
@@ -69,3 +70,52 @@ jobs:
           color=$(echo "$coverage < 80" | bc | awk '{if ($1) print "red"; else print "green"}')
           curl -s -X POST "https://pizza-factory.cs329.click/api/badge/${{ secrets.NET_ID }}/jwtpizzacoverage?label=Coverage&value=${coverage}%25&color=$color" \
             -H "authorization: bearer ${{ secrets.FACTORY_API_KEY }}"
+
+  build:
+    name: Build (Vite)
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'npm'
+
+      - name: Set version.json (for footer)
+        id: set_version
+        run: |
+          version=$(date +'%Y%m%d.%H%M%S')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          printf '{"version": "%s" }' "$version" > public/version.json
+
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+          # 404 for SPA routing on Pages
+          cp dist/index.html dist/404.html
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
