@@ -1,4 +1,4 @@
-name: Frontend CI
+name: Frontend CI + Deploy (S3/CloudFront)
 
 on:
   push:
@@ -75,6 +75,8 @@ jobs:
     name: Build (Vite)
     needs: test
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -96,26 +98,41 @@ jobs:
         run: |
           npm ci
           npm run build
-          # 404 for SPA routing on Pages
-          cp dist/index.html dist/404.html
+          # Remove GitHub Pages 404 hack – CloudFront handles routing now
+          rm -f dist/404.html || true
 
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: package
           path: dist/
 
   deploy:
-    name: Deploy to GitHub Pages
+    name: Deploy to AWS S3 + CloudFront
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      id-token: write 
+      contents: read
     runs-on: ubuntu-latest
+    env:
+      version: ${{ needs.build.outputs.version }}
     steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          audience: sts.amazonaws.com
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT }}:role/jwt-pizza-frontend-ci
+
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: package
+          path: dist/
+
+      - name: Deploy to S3 and Invalidate CloudFront
+        run: |
+          echo "Deploying version $version"
+          aws s3 cp dist s3://${{ secrets.APP_BUCKET }} --recursive
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
