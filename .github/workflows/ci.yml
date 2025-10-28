@@ -112,7 +112,7 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
-      id-token: write 
+      id-token: write
       contents: read
     runs-on: ubuntu-latest
     env:
@@ -136,3 +136,28 @@ jobs:
           echo "Deploying version $version"
           aws s3 cp dist s3://${{ secrets.APP_BUCKET }} --recursive
           aws cloudfront create-invalidation --distribution-id ${{ secrets.DISTRIBUTION_ID }} --paths "/*"
+
+  release:
+    name: Create GitHub Release
+    needs:
+      - build
+      - deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      version: ${{ needs.build.outputs.version }}
+    steps:
+      - name: Create Release
+        uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5
+        with:
+          tag: version-${{ env.version }}
+          name: Version ${{ env.version }}
+          makeLatest: true
+          body: |
+            ## 🚀 Changes
+
+            ${{ github.event.head_commit.message }}
+
+            **commit**: ${{ github.sha }}
